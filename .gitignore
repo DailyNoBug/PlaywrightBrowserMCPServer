@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+*.log
+data/sessions/
+data/auth-contexts/
+data/snapshots/
+data/exports/
+data/logs/
+!data/.gitkeep
+!data/sessions/.gitkeep
+!data/auth-contexts/.gitkeep
+!data/logs/.gitkeep
+!data/snapshots/.gitkeep
+!data/exports/.gitkeep

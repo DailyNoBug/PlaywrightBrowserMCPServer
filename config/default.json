@@ -1,0 +1,24 @@
+{
+  "browser": {
+    "defaultType": "chromium",
+    "headless": false,
+    "launchTimeoutMs": 8000,
+    "actionTimeoutMs": 10000
+  },
+  "security": {
+    "allowDomains": ["example.com", "app.example.com", "localhost", "127.0.0.1", "www.bilibili.com", "bilibili.com", "space.bilibili.com"],
+    "denyDomains": [],
+    "allowPersistAuthContext": true,
+    "maxExportRows": 1000,
+    "maxPaginationPages": 10
+  },
+  "storage": {
+    "baseDir": "./data"
+  },
+  "logging": {
+    "level": "info"
+  },
+  "snapshot": {
+    "defaultDetailLevel": "normal"
+  }
+}
