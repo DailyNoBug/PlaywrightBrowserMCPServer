@@ -114,4 +114,13 @@ export interface BrowserAdapter {
   saveStorageState(handle: BrowserSessionHandle, path: string): Promise<void>;
 
   loadStorageState(handle: BrowserSessionHandle, path: string): Promise<void>;
+
+  /**
+   * Set how the next native dialog (alert/confirm/prompt) will be handled.
+   * Call this before the action that triggers the dialog (e.g. before click that triggers confirm()).
+   */
+  setDialogResponse(
+    handle: BrowserSessionHandle,
+    options: { accept: boolean; promptText?: string }
+  ): Promise<void>;
 }

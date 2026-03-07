@@ -18,6 +18,8 @@
 | [架构文档](docs/architecture.md) | 分层结构、模块划分、技术选型、依赖关系 |
 | [代码指南](docs/code-guide.md) | 各目录与文件的职责说明，每部分代码做了什么 |
 | [工程需求](docs/cursor_browser_mcp_engineering_requirements.md) | 功能与接口规格、推荐目录结构、实现细节 |
+| [错误码说明](docs/error-codes.md) | ToolError 错误码、含义与处理建议 |
+| [配置说明](docs/configuration.md) | 配置项一览、域名规则、环境变量 |
 
 ## 快速开始
 
@@ -25,6 +27,13 @@
 npm install
 npm run build
 npm run dev   # 以 stdio 方式启动，供 Cursor 连接
+```
+
+**验证功能（访问真实网站）**：集成测试会启动无头浏览器访问 example.com 并做快照，确保整条链路正常。
+
+```bash
+npx playwright install chromium   # 首次需安装浏览器
+npm run test:integration
 ```
 
 ---
@@ -262,6 +271,6 @@ npm run build
 - **Session**: `browser.create_session`, `browser.get_session`, `browser.list_sessions`, `browser.close_session`
 - **Human**: `browser.pause_for_human`, `browser.resume_session`, `browser.get_human_wait_state`
 - **Auth**: `browser.save_auth_context`, `browser.load_auth_context`, `browser.list_auth_contexts`, `browser.delete_auth_context`
-- **Page**: `browser.navigate`, `browser.click`, `browser.fill`, `browser.select_option`, `browser.wait`, `browser.scroll`, `browser.take_screenshot`
+- **Page**: `browser.navigate`, `browser.click`, `browser.fill`, `browser.select_option`, `browser.wait`, `browser.scroll`, `browser.take_screenshot`, `browser.handle_dialog`
 - **Extract**: `browser.snapshot`, `browser.extract_text`, `browser.extract_table`, `browser.extract_form`, `browser.get_interactive_elements`
 - **DevAssist**: `browser.generate_playwright_script`, `browser.generate_page_object`, `browser.generate_data_schema`, `browser.export_extraction_result`

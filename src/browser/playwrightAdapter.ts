@@ -28,8 +28,14 @@ interface SessionState {
   page: Page;
 }
 
+interface PendingDialogResponse {
+  accept: boolean;
+  promptText?: string;
+}
+
 export class PlaywrightAdapter implements BrowserAdapter {
   private readonly sessions = new Map<string, SessionState>();
+  private readonly pendingDialogResponses = new Map<string, PendingDialogResponse>();
   private readonly actionTimeoutMs: number;
 
   constructor(options: { actionTimeoutMs?: number } = {}) {
@@ -59,8 +65,19 @@ export class PlaywrightAdapter implements BrowserAdapter {
       const actionTimeout = options.actionTimeoutMs ?? this.actionTimeoutMs;
       context.setDefaultTimeout(actionTimeout);
       const page = await context.newPage();
-      this.sessions.set(options.sessionId, { browser, context, page });
-      return { sessionId: options.sessionId };
+      const sessionId = options.sessionId;
+      context.on('dialog', (dialog) => {
+        const pending = this.pendingDialogResponses.get(sessionId);
+        this.pendingDialogResponses.delete(sessionId);
+        if (pending) {
+          if (pending.accept) dialog.accept(pending.promptText).catch(() => {});
+          else dialog.dismiss().catch(() => {});
+        } else {
+          dialog.dismiss().catch(() => {});
+        }
+      });
+      this.sessions.set(sessionId, { browser, context, page });
+      return { sessionId };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       const code = msg.includes('Timeout') || msg.includes('timeout') ? 'TIMEOUT' : 'BROWSER_START_FAILED';
@@ -74,11 +91,23 @@ export class PlaywrightAdapter implements BrowserAdapter {
 
   async closeSession(handle: BrowserSessionHandle): Promise<void> {
     const state = this.sessions.get(handle.sessionId);
+    this.pendingDialogResponses.delete(handle.sessionId);
     if (state) {
       this.sessions.delete(handle.sessionId);
       await state.context.close().catch(() => {});
       await state.browser.close().catch(() => {});
     }
+  }
+
+  async setDialogResponse(
+    handle: BrowserSessionHandle,
+    options: { accept: boolean; promptText?: string }
+  ): Promise<void> {
+    this.getState(handle);
+    this.pendingDialogResponses.set(handle.sessionId, {
+      accept: options.accept,
+      promptText: options.promptText,
+    });
   }
 
   async navigate(

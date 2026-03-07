@@ -24,6 +24,7 @@ import * as pageSelectOption from '../tools/page/selectOption.js';
 import * as pageWait from '../tools/page/wait.js';
 import * as pageScroll from '../tools/page/scroll.js';
 import * as pageScreenshot from '../tools/page/screenshot.js';
+import * as pageHandleDialog from '../tools/page/handleDialog.js';
 import * as extractSnapshot from '../tools/extract/snapshot.js';
 import * as extractText from '../tools/extract/extractText.js';
 import * as extractTable from '../tools/extract/extractTable.js';
@@ -33,8 +34,33 @@ import * as devPlaywright from '../tools/devassist/generatePlaywrightScript.js';
 import * as devPageObject from '../tools/devassist/generatePageObject.js';
 import * as devDataSchema from '../tools/devassist/generateDataSchema.js';
 import * as devExport from '../tools/devassist/exportExtractionResult.js';
+import type { Logger } from 'pino';
 import { logEvent } from '../logging/logger.js';
 import { appendSessionLog } from '../resources/latestLogsResource.js';
+
+/** Wraps a tool handler to log duration and optional sessionId on completion/failure. */
+function withToolDuration<T>(
+  logger: Logger | undefined,
+  toolName: string,
+  handler: (input: T) => Promise<{ content: { type: 'text'; text: string }[]; structuredContent?: Record<string, unknown> }>
+): (input: T) => Promise<{ content: { type: 'text'; text: string }[]; structuredContent?: Record<string, unknown> }> {
+  return async (input: T) => {
+    const start = Date.now();
+    const sessionId = (input as { sessionId?: string })?.sessionId;
+    try {
+      const result = await handler(input);
+      if (logger) {
+        logEvent(logger, 'info', 'tool_completed', { toolName, sessionId, durationMs: Date.now() - start });
+      }
+      return result;
+    } catch (err) {
+      if (logger) {
+        logEvent(logger, 'warn', 'tool_failed', { toolName, sessionId, durationMs: Date.now() - start });
+      }
+      throw err;
+    }
+  };
+}
 
 export function registerTools(server: McpServer, deps: ServerDeps): void {
   const sessionManager = deps.sessionManager as import('../browser/sessionManager.js').SessionManager;
@@ -50,7 +76,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
       inputSchema: sessionCreate.createSessionInputSchema,
       outputSchema: sessionCreate.createSessionOutputSchema,
     },
-    async (input) => {
+    withToolDuration(deps.logger as Logger | undefined, 'browser.create_session', async (input) => {
       const parsed = sessionCreate.createSessionInputSchema.parse(input);
       const storageStatePath =
         parsed.authContextId && authContextService
@@ -66,7 +92,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
         content: [{ type: 'text' as const, text: JSON.stringify(out) }],
         structuredContent: out as unknown as Record<string, unknown>,
       };
-    }
+    })
   );
 
   server.registerTool(
@@ -147,8 +173,14 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
       const parsed = pageNavigate.navigateInputSchema.parse(input);
       logEvent(deps.logger, 'info', 'navigation_started', { sessionId: parsed.sessionId, url: parsed.url, toolName: 'browser.navigate' });
       appendSessionLog(parsed.sessionId, { event: 'navigation_started', sessionId: parsed.sessionId, toolName: 'browser.navigate' });
-      const sec = (deps.config as { security?: { allowDomains?: string[]; denyDomains?: string[] } }).security;
-      const securityConfig = sec ? { allowDomains: sec.allowDomains ?? [], denyDomains: sec.denyDomains ?? [] } : undefined;
+      const sec = (deps.config as { security?: { domainWhitelistEnabled?: boolean; allowDomains?: string[]; denyDomains?: string[] } }).security;
+      const securityConfig = sec
+        ? {
+            domainWhitelistEnabled: sec.domainWhitelistEnabled !== false,
+            allowDomains: sec.allowDomains ?? [],
+            denyDomains: sec.denyDomains ?? [],
+          }
+        : undefined;
       const out = await pageNavigate.navigate(sessionManager, parsed, securityConfig);
       logEvent(deps.logger, 'info', 'navigation_finished', {
         sessionId: parsed.sessionId,
@@ -192,6 +224,16 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
     const baseDir = (deps.config as { storage?: { baseDir?: string } }).storage?.baseDir ?? './data';
     const out = await pageScreenshot.takeScreenshot(sessionManager, baseDir, pageScreenshot.screenshotInputSchema.parse(input));
     return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out as unknown as Record<string, unknown> };
+  });
+  server.registerTool('browser.handle_dialog', {
+    title: 'Handle Dialog',
+    description: 'Set how the next native dialog (alert/confirm/prompt) will be handled. Call before the action that triggers the dialog.',
+    inputSchema: pageHandleDialog.handleDialogInputSchema,
+    outputSchema: z.object({ success: z.literal(true) }),
+  }, async (input) => {
+    const parsed = pageHandleDialog.handleDialogInputSchema.parse(input);
+    await pageHandleDialog.handleDialog(sessionManager, parsed);
+    return { content: [{ type: 'text' as const, text: JSON.stringify({ success: true }) }], structuredContent: { success: true as const } };
   });
   server.registerTool('browser.snapshot', { title: 'Page Snapshot', description: 'Get a structured snapshot of the current page for LLM consumption.', inputSchema: extractSnapshot.snapshotInputSchema, outputSchema: z.any() }, async (input) => {
     const parsed = extractSnapshot.snapshotInputSchema.parse(input);

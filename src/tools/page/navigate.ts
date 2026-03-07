@@ -14,7 +14,7 @@ export type NavigateInput = z.infer<typeof navigateInputSchema>;
 export async function navigate(
   sessionManager: SessionManager,
   input: NavigateInput,
-  securityConfig?: { allowDomains: string[]; denyDomains: string[] }
+  securityConfig?: { domainWhitelistEnabled?: boolean; allowDomains: string[]; denyDomains: string[] }
 ): Promise<{ sessionId: string; currentUrl: string; title?: string }> {
   const session = sessionManager.getSession(input.sessionId);
   if (!session) {
@@ -22,7 +22,8 @@ export async function navigate(
       JSON.stringify(createToolError('SESSION_NOT_FOUND', `Session ${input.sessionId} not found`))
     );
   }
-  if (securityConfig && !isDomainAllowed(input.url, securityConfig)) {
+  const whitelistOn = securityConfig?.domainWhitelistEnabled !== false;
+  if (whitelistOn && securityConfig && !isDomainAllowed(input.url, securityConfig)) {
     throw new Error(
       JSON.stringify(createToolError('DOMAIN_NOT_ALLOWED', `URL domain not allowed: ${input.url}`))
     );

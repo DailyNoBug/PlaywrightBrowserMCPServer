@@ -3,11 +3,15 @@ import { z } from 'zod';
 export const browserConfigSchema = z.object({
   defaultType: z.enum(['chromium']).default('chromium'),
   headless: z.boolean().default(false),
-  launchTimeoutMs: z.number().int().positive().default(8000),
-  actionTimeoutMs: z.number().int().positive().default(10000),
+  launchTimeoutMs: z.number().int().positive().max(120000).default(8000),
+  actionTimeoutMs: z.number().int().positive().max(120000).default(10000),
+  /** Max concurrent sessions; create_session fails when at limit. Default 10. */
+  maxSessions: z.number().int().positive().max(100).default(10),
 });
 
 export const securityConfigSchema = z.object({
+  /** When true, only allowDomains (and denyDomains) apply. When false, domain check is disabled (allow any URL). */
+  domainWhitelistEnabled: z.boolean().default(true),
   allowDomains: z.array(z.string()).default([]),
   denyDomains: z.array(z.string()).default([]),
   allowPersistAuthContext: z.boolean().default(true),

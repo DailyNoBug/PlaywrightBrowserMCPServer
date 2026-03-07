@@ -32,10 +32,32 @@ async function main(): Promise<void> {
   const adapter = new PlaywrightAdapter({
     actionTimeoutMs: config.browser.actionTimeoutMs,
   });
-  const sessionManager = new SessionManager(adapter, logger);
+  const sessionManager = new SessionManager(adapter, logger, {
+    maxSessions: config.browser.maxSessions,
+  });
   const humanCoordinator = new HumanCoordinator(sessionManager);
   const authContextService = new AuthContextService(storage, config.storage.baseDir);
   const latestExtractions = createLatestExtractionsStore();
+
+  const shutdown = async (): Promise<void> => {
+    const log = getLogger();
+    log.info({ event: 'shutdown_started' });
+    try {
+      await sessionManager.closeAllSessions();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      log.warn({ event: 'shutdown_close_sessions_error', error: msg });
+    }
+    log.info({ event: 'shutdown_finished' });
+    process.exit(0);
+  };
+
+  process.on('SIGINT', () => {
+    void shutdown();
+  });
+  process.on('SIGTERM', () => {
+    void shutdown();
+  });
 
   try {
     await runServer({

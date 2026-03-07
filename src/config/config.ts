@@ -1,8 +1,16 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { configSchema, type AppConfig } from './schema.js';
 
 const DEFAULT_CONFIG_PATH = 'config/default.json';
+
+/** Ensure storage baseDir exists; create if missing. */
+function ensureStorageDir(baseDir: string): void {
+  const absolute = resolve(process.cwd(), baseDir);
+  if (!existsSync(absolute)) {
+    mkdirSync(absolute, { recursive: true });
+  }
+}
 
 export function loadConfig(configPath?: string): AppConfig {
   const path = resolve(
@@ -24,7 +32,9 @@ export function loadConfig(configPath?: string): AppConfig {
       .join('; ');
     throw new Error(`Invalid config: ${issues}`);
   }
-  return result.data;
+  const config = result.data;
+  ensureStorageDir(config.storage.baseDir);
+  return config;
 }
 
 export type { AppConfig } from './schema.js';

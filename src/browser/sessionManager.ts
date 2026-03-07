@@ -6,6 +6,7 @@
 import type { Logger } from 'pino';
 import type { BrowserAdapter, BrowserSessionHandle } from './adapter.js';
 import type { BrowserSessionMeta, SessionStatus } from '../types/session.js';
+import { createToolError } from '../server/error.js';
 import { nowIso } from '../utils/time.js';
 import { generateSessionId } from '../utils/ids.js';
 import { logEvent } from '../logging/logger.js';
@@ -30,14 +31,20 @@ interface SessionEntry {
   handle: BrowserSessionHandle;
 }
 
+export interface SessionManagerOptions {
+  maxSessions?: number;
+}
+
 export class SessionManager {
   private readonly sessions = new Map<string, SessionEntry>();
   private readonly adapter: BrowserAdapter;
   private readonly logger?: Logger;
+  private readonly maxSessions: number;
 
-  constructor(adapter: BrowserAdapter, logger?: Logger) {
+  constructor(adapter: BrowserAdapter, logger?: Logger, options?: SessionManagerOptions) {
     this.adapter = adapter;
     this.logger = logger;
+    this.maxSessions = options?.maxSessions ?? 10;
   }
 
   async createSession(options: {
@@ -49,6 +56,11 @@ export class SessionManager {
     launchTimeoutMs?: number;
     actionTimeoutMs?: number;
   }): Promise<{ sessionId: string; meta: BrowserSessionMeta }> {
+    if (this.sessions.size >= this.maxSessions) {
+      throw new Error(
+        JSON.stringify(createToolError('INVALID_INPUT', `Max sessions limit reached (${this.maxSessions}). Close a session first.`))
+      );
+    }
     const sessionId = generateSessionId();
     const headless = options.headless ?? false;
     const meta: BrowserSessionMeta = {
@@ -121,11 +133,36 @@ export class SessionManager {
   async closeSession(sessionId: string): Promise<void> {
     const entry = this.sessions.get(sessionId);
     if (!entry) throw new Error(`Session ${sessionId} not found`);
-    await this.adapter.closeSession(entry.handle);
-    this.sessions.delete(sessionId);
+    try {
+      await this.adapter.closeSession(entry.handle);
+    } finally {
+      this.sessions.delete(sessionId);
+    }
+  }
+
+  /** Close all sessions (e.g. on process shutdown). Ignores per-session errors. */
+  async closeAllSessions(): Promise<void> {
+    const ids = Array.from(this.sessions.keys());
+    for (const sessionId of ids) {
+      try {
+        await this.closeSession(sessionId);
+        if (this.logger) {
+          logEvent(this.logger, 'info', 'session_closed', { sessionId, reason: 'shutdown' });
+        }
+      } catch (err) {
+        if (this.logger) {
+          const message = err instanceof Error ? err.message : String(err);
+          logEvent(this.logger, 'warn', 'session_close_failed', { sessionId, error: message });
+        }
+      }
+    }
   }
 
   getAdapter(): BrowserAdapter {
     return this.adapter;
+  }
+
+  getSessionCount(): number {
+    return this.sessions.size;
   }
 }
