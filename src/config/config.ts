@@ -1,12 +1,18 @@
 import { readFileSync, mkdirSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, dirname } from 'node:path';
 import { configSchema, type AppConfig } from './schema.js';
 
 const DEFAULT_CONFIG_PATH = 'config/default.json';
 
+/** Resolve application root, compatible with pkg-packed binary and normal Node. */
+function getAppRoot(): string {
+  const isPkged = (process as unknown as { pkg?: unknown }).pkg !== undefined;
+  return isPkged ? dirname(process.execPath) : process.cwd();
+}
+
 /** Ensure storage baseDir exists; create if missing. */
 function ensureStorageDir(baseDir: string): void {
-  const absolute = resolve(process.cwd(), baseDir);
+  const absolute = resolve(getAppRoot(), baseDir);
   if (!existsSync(absolute)) {
     mkdirSync(absolute, { recursive: true });
   }
@@ -14,7 +20,7 @@ function ensureStorageDir(baseDir: string): void {
 
 export function loadConfig(configPath?: string): AppConfig {
   const path = resolve(
-    process.cwd(),
+    getAppRoot(),
     configPath ?? process.env.CONFIG_PATH ?? DEFAULT_CONFIG_PATH
   );
   let raw: unknown;

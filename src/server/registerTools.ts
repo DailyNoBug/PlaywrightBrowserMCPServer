@@ -66,6 +66,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
   const sessionManager = deps.sessionManager as import('../browser/sessionManager.js').SessionManager;
   const humanCoordinator = deps.humanCoordinator as import('../human/humanCoordinator.js').HumanCoordinator;
   const authContextService = deps.authContextService as import('../auth/authContextService.js').AuthContextService;
+  const logger = deps.logger as Logger | undefined;
   if (!sessionManager) return;
 
   server.registerTool(
@@ -76,7 +77,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
       inputSchema: sessionCreate.createSessionInputSchema,
       outputSchema: sessionCreate.createSessionOutputSchema,
     },
-    withToolDuration(deps.logger as Logger | undefined, 'browser.create_session', async (input) => {
+    withToolDuration(logger, 'browser.create_session', async (input) => {
       const parsed = sessionCreate.createSessionInputSchema.parse(input);
       const storageStatePath =
         parsed.authContextId && authContextService
@@ -103,7 +104,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
       inputSchema: sessionGet.getSessionInputSchema,
       outputSchema: z.any(),
     },
-    async (input) => {
+    withToolDuration(logger, 'browser.get_session', async (input) => {
       const parsed = sessionGet.getSessionInputSchema.parse(input);
       const meta = await sessionGet.getSession(sessionManager, parsed);
       if (!meta) {
@@ -115,7 +116,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
         content: [{ type: 'text' as const, text: JSON.stringify(meta) }],
         structuredContent: meta as unknown as Record<string, unknown>,
       };
-    }
+    })
   );
 
   server.registerTool(
@@ -125,13 +126,13 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
       description: 'List all active browser sessions.',
       outputSchema: z.object({ sessions: z.array(z.any()) }),
     },
-    async () => {
+    withToolDuration(logger, 'browser.list_sessions', async (_input) => {
       const out = await sessionList.listSessions(sessionManager);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(out) }],
         structuredContent: out as unknown as Record<string, unknown>,
       };
-    }
+    })
   );
 
   server.registerTool(
@@ -142,7 +143,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
       inputSchema: sessionClose.closeSessionInputSchema,
       outputSchema: z.object({ success: z.literal(true) }),
     },
-    async (input) => {
+    withToolDuration(logger, 'browser.close_session', async (input) => {
       const parsed = sessionClose.closeSessionInputSchema.parse(input);
       await sessionClose.closeSession(sessionManager, parsed);
       logEvent(deps.logger, 'info', 'session_closed', {
@@ -154,7 +155,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
         content: [{ type: 'text' as const, text: JSON.stringify({ success: true }) }],
         structuredContent: { success: true as const },
       };
-    }
+    })
   );
 
   server.registerTool(
@@ -169,7 +170,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
         title: z.string().optional(),
       }),
     },
-    async (input) => {
+    withToolDuration(logger, 'browser.navigate', async (input) => {
       const parsed = pageNavigate.navigateInputSchema.parse(input);
       logEvent(deps.logger, 'info', 'navigation_started', { sessionId: parsed.sessionId, url: parsed.url, toolName: 'browser.navigate' });
       appendSessionLog(parsed.sessionId, { event: 'navigation_started', sessionId: parsed.sessionId, toolName: 'browser.navigate' });
@@ -192,57 +193,57 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
         content: [{ type: 'text' as const, text: JSON.stringify(out) }],
         structuredContent: out as unknown as Record<string, unknown>,
       };
-    }
+    })
   );
 
   const defaultDetailLevel = (deps.config as { snapshot?: { defaultDetailLevel?: 'minimal' | 'normal' | 'rich' } }).snapshot?.defaultDetailLevel ?? 'normal';
   const latestExtractions = deps.latestExtractions as import('../tools/devassist/latestExtractions.js').LatestExtractionsStore | undefined;
 
-  server.registerTool('browser.click', { title: 'Click', description: 'Click an element by selector.', inputSchema: pageClick.clickInputSchema }, async (input) => {
+  server.registerTool('browser.click', { title: 'Click', description: 'Click an element by selector.', inputSchema: pageClick.clickInputSchema }, withToolDuration(logger, 'browser.click', async (input) => {
     await pageClick.click(sessionManager, pageClick.clickInputSchema.parse(input));
     return { content: [{ type: 'text' as const, text: 'OK' }] };
-  });
-  server.registerTool('browser.fill', { title: 'Fill', description: 'Fill an input by selector. Value is not logged.', inputSchema: pageFill.fillInputSchema }, async (input) => {
+  }));
+  server.registerTool('browser.fill', { title: 'Fill', description: 'Fill an input by selector. Value is not logged.', inputSchema: pageFill.fillInputSchema }, withToolDuration(logger, 'browser.fill', async (input) => {
     const parsed = pageFill.fillInputSchema.parse(input);
     await pageFill.fill(sessionManager, parsed);
     appendSessionLog(parsed.sessionId, { event: 'fill', sessionId: parsed.sessionId, toolName: 'browser.fill' });
     return { content: [{ type: 'text' as const, text: 'OK' }] };
-  });
-  server.registerTool('browser.select_option', { title: 'Select Option', description: 'Select option(s) in a select element.', inputSchema: pageSelectOption.selectOptionInputSchema }, async (input) => {
+  }));
+  server.registerTool('browser.select_option', { title: 'Select Option', description: 'Select option(s) in a select element.', inputSchema: pageSelectOption.selectOptionInputSchema }, withToolDuration(logger, 'browser.select_option', async (input) => {
     await pageSelectOption.selectOption(sessionManager, pageSelectOption.selectOptionInputSchema.parse(input));
     return { content: [{ type: 'text' as const, text: 'OK' }] };
-  });
-  server.registerTool('browser.wait', { title: 'Wait', description: 'Wait for a number of milliseconds.', inputSchema: pageWait.waitInputSchema }, async (input) => {
+  }));
+  server.registerTool('browser.wait', { title: 'Wait', description: 'Wait for a number of milliseconds.', inputSchema: pageWait.waitInputSchema }, withToolDuration(logger, 'browser.wait', async (input) => {
     await pageWait.wait(sessionManager, pageWait.waitInputSchema.parse(input));
     return { content: [{ type: 'text' as const, text: 'OK' }] };
-  });
-  server.registerTool('browser.scroll', { title: 'Scroll', description: 'Scroll the page or an element into view.', inputSchema: pageScroll.scrollInputSchema }, async (input) => {
+  }));
+  server.registerTool('browser.scroll', { title: 'Scroll', description: 'Scroll the page or an element into view.', inputSchema: pageScroll.scrollInputSchema }, withToolDuration(logger, 'browser.scroll', async (input) => {
     await pageScroll.scroll(sessionManager, pageScroll.scrollInputSchema.parse(input));
     return { content: [{ type: 'text' as const, text: 'OK' }] };
-  });
-  server.registerTool('browser.take_screenshot', { title: 'Take Screenshot', description: 'Take a screenshot of the current page.', inputSchema: pageScreenshot.screenshotInputSchema, outputSchema: z.object({ path: z.string() }) }, async (input) => {
+  }));
+  server.registerTool('browser.take_screenshot', { title: 'Take Screenshot', description: 'Take a screenshot of the current page.', inputSchema: pageScreenshot.screenshotInputSchema, outputSchema: z.object({ path: z.string() }) }, withToolDuration(logger, 'browser.take_screenshot', async (input) => {
     const baseDir = (deps.config as { storage?: { baseDir?: string } }).storage?.baseDir ?? './data';
     const out = await pageScreenshot.takeScreenshot(sessionManager, baseDir, pageScreenshot.screenshotInputSchema.parse(input));
     return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out as unknown as Record<string, unknown> };
-  });
+  }));
   server.registerTool('browser.handle_dialog', {
     title: 'Handle Dialog',
     description: 'Set how the next native dialog (alert/confirm/prompt) will be handled. Call before the action that triggers the dialog.',
     inputSchema: pageHandleDialog.handleDialogInputSchema,
     outputSchema: z.object({ success: z.literal(true) }),
-  }, async (input) => {
+  }, withToolDuration(logger, 'browser.handle_dialog', async (input) => {
     const parsed = pageHandleDialog.handleDialogInputSchema.parse(input);
     await pageHandleDialog.handleDialog(sessionManager, parsed);
     return { content: [{ type: 'text' as const, text: JSON.stringify({ success: true }) }], structuredContent: { success: true as const } };
-  });
-  server.registerTool('browser.snapshot', { title: 'Page Snapshot', description: 'Get a structured snapshot of the current page for LLM consumption.', inputSchema: extractSnapshot.snapshotInputSchema, outputSchema: z.any() }, async (input) => {
+  }));
+  server.registerTool('browser.snapshot', { title: 'Page Snapshot', description: 'Get a structured snapshot of the current page for LLM consumption.', inputSchema: extractSnapshot.snapshotInputSchema, outputSchema: z.any() }, withToolDuration(logger, 'browser.snapshot', async (input) => {
     const parsed = extractSnapshot.snapshotInputSchema.parse(input);
     const out = await extractSnapshot.snapshot(sessionManager, defaultDetailLevel, parsed);
     logEvent(deps.logger, 'info', 'snapshot_generated', { sessionId: parsed.sessionId, toolName: 'browser.snapshot' });
     appendSessionLog(parsed.sessionId, { event: 'snapshot_generated', sessionId: parsed.sessionId, toolName: 'browser.snapshot' });
     return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out as unknown as Record<string, unknown> };
-  });
-  server.registerTool('browser.extract_text', { title: 'Extract Text', description: 'Extract visible text from the page or a selector.', inputSchema: extractText.extractTextInputSchema, outputSchema: z.object({ sessionId: z.string(), sourceUrl: z.string(), extractedAt: z.string(), textBlocks: z.array(z.string()) }) }, async (input) => {
+  }));
+  server.registerTool('browser.extract_text', { title: 'Extract Text', description: 'Extract visible text from the page or a selector.', inputSchema: extractText.extractTextInputSchema, outputSchema: z.object({ sessionId: z.string(), sourceUrl: z.string(), extractedAt: z.string(), textBlocks: z.array(z.string()) }) }, withToolDuration(logger, 'browser.extract_text', async (input) => {
     const parsed = extractText.extractTextInputSchema.parse(input);
     const out = await extractText.extractText(sessionManager, parsed);
     logEvent(deps.logger, 'info', 'extraction_completed', { sessionId: parsed.sessionId, toolName: 'browser.extract_text' });
@@ -252,8 +253,8 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
       latestExtractions.sessionId = parsed.sessionId;
     }
     return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out as unknown as Record<string, unknown> };
-  });
-  server.registerTool('browser.extract_table', { title: 'Extract Table', description: 'Extract table data from the page.', inputSchema: extractTable.extractTableInputSchema, outputSchema: z.any() }, async (input) => {
+  }));
+  server.registerTool('browser.extract_table', { title: 'Extract Table', description: 'Extract table data from the page.', inputSchema: extractTable.extractTableInputSchema, outputSchema: z.any() }, withToolDuration(logger, 'browser.extract_table', async (input) => {
     const parsed = extractTable.extractTableInputSchema.parse(input);
     const out = await extractTable.extractTable(sessionManager, parsed);
     logEvent(deps.logger, 'info', 'extraction_completed', { sessionId: parsed.sessionId, toolName: 'browser.extract_table' });
@@ -263,8 +264,8 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
       latestExtractions.sessionId = parsed.sessionId;
     }
     return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out as unknown as Record<string, unknown> };
-  });
-  server.registerTool('browser.extract_form', { title: 'Extract Form', description: 'Extract form field schema from the page.', inputSchema: extractForm.extractFormInputSchema, outputSchema: z.any() }, async (input) => {
+  }));
+  server.registerTool('browser.extract_form', { title: 'Extract Form', description: 'Extract form field schema from the page.', inputSchema: extractForm.extractFormInputSchema, outputSchema: z.any() }, withToolDuration(logger, 'browser.extract_form', async (input) => {
     const parsed = extractForm.extractFormInputSchema.parse(input);
     const out = await extractForm.extractForm(sessionManager, parsed);
     logEvent(deps.logger, 'info', 'extraction_completed', { sessionId: parsed.sessionId, toolName: 'browser.extract_form' });
@@ -274,33 +275,33 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
       latestExtractions.sessionId = parsed.sessionId;
     }
     return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out as unknown as Record<string, unknown> };
-  });
-  server.registerTool('browser.get_interactive_elements', { title: 'Get Interactive Elements', description: 'Get summary of interactive elements (buttons, links, inputs) on the page.', inputSchema: extractInteractive.getInteractiveElementsInputSchema, outputSchema: z.object({ sessionId: z.string(), sourceUrl: z.string(), elements: z.array(z.any()) }) }, async (input) => {
+  }));
+  server.registerTool('browser.get_interactive_elements', { title: 'Get Interactive Elements', description: 'Get summary of interactive elements (buttons, links, inputs) on the page.', inputSchema: extractInteractive.getInteractiveElementsInputSchema, outputSchema: z.object({ sessionId: z.string(), sourceUrl: z.string(), elements: z.array(z.any()) }) }, withToolDuration(logger, 'browser.get_interactive_elements', async (input) => {
     const out = await extractInteractive.getInteractiveElements(sessionManager, extractInteractive.getInteractiveElementsInputSchema.parse(input));
     return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out as unknown as Record<string, unknown> };
-  });
+  }));
 
   if (latestExtractions) {
-    server.registerTool('browser.generate_playwright_script', { title: 'Generate Playwright Script', description: 'Generate a Playwright test script from current session.', inputSchema: devPlaywright.generatePlaywrightScriptInputSchema, outputSchema: z.object({ language: z.literal('typescript'), code: z.string(), notes: z.array(z.string()) }) }, async (input) => {
+    server.registerTool('browser.generate_playwright_script', { title: 'Generate Playwright Script', description: 'Generate a Playwright test script from current session.', inputSchema: devPlaywright.generatePlaywrightScriptInputSchema, outputSchema: z.object({ language: z.literal('typescript'), code: z.string(), notes: z.array(z.string()) }) }, withToolDuration(logger, 'browser.generate_playwright_script', async (input) => {
       const out = await devPlaywright.generatePlaywrightScript(sessionManager, devPlaywright.generatePlaywrightScriptInputSchema.parse(input));
       return { content: [{ type: 'text' as const, text: out.code }], structuredContent: out as unknown as Record<string, unknown> };
-    });
-    server.registerTool('browser.generate_page_object', { title: 'Generate Page Object', description: 'Generate a page object class from current page.', inputSchema: devPageObject.generatePageObjectInputSchema, outputSchema: z.object({ language: z.literal('typescript'), code: z.string() }) }, async (input) => {
+    }));
+    server.registerTool('browser.generate_page_object', { title: 'Generate Page Object', description: 'Generate a page object class from current page.', inputSchema: devPageObject.generatePageObjectInputSchema, outputSchema: z.object({ language: z.literal('typescript'), code: z.string() }) }, withToolDuration(logger, 'browser.generate_page_object', async (input) => {
       const out = await devPageObject.generatePageObject(sessionManager, devPageObject.generatePageObjectInputSchema.parse(input));
       return { content: [{ type: 'text' as const, text: out.code }], structuredContent: out as unknown as Record<string, unknown> };
-    });
-    server.registerTool('browser.generate_data_schema', { title: 'Generate Data Schema', description: 'Generate TypeScript/Zod/JSON schema from latest table or form extraction.', inputSchema: devDataSchema.generateDataSchemaInputSchema, outputSchema: z.object({ format: z.string(), code: z.string() }) }, async (input) => {
+    }));
+    server.registerTool('browser.generate_data_schema', { title: 'Generate Data Schema', description: 'Generate TypeScript/Zod/JSON schema from latest table or form extraction.', inputSchema: devDataSchema.generateDataSchemaInputSchema, outputSchema: z.object({ format: z.string(), code: z.string() }) }, withToolDuration(logger, 'browser.generate_data_schema', async (input) => {
       const parsed = devDataSchema.generateDataSchemaInputSchema.parse(input);
       const out = devDataSchema.generateDataSchema(latestExtractions, parsed);
       return { content: [{ type: 'text' as const, text: out.code }], structuredContent: out as unknown as Record<string, unknown> };
-    });
-    server.registerTool('browser.export_extraction_result', { title: 'Export Extraction Result', description: 'Export latest table/form/text extraction to a file.', inputSchema: devExport.exportExtractionResultInputSchema, outputSchema: z.object({ exportPath: z.string() }) }, async (input) => {
+    }));
+    server.registerTool('browser.export_extraction_result', { title: 'Export Extraction Result', description: 'Export latest table/form/text extraction to a file.', inputSchema: devExport.exportExtractionResultInputSchema, outputSchema: z.object({ exportPath: z.string() }) }, withToolDuration(logger, 'browser.export_extraction_result', async (input) => {
       const parsed = devExport.exportExtractionResultInputSchema.parse(input);
       const baseDir = (deps.config as { storage?: { baseDir?: string } }).storage?.baseDir ?? './data';
       const security = (deps.config as { security?: { maxExportRows?: number } }).security ?? {};
       const out = await devExport.exportExtractionResult(latestExtractions, deps.storage, baseDir, { maxExportRows: security.maxExportRows ?? 1000 }, parsed);
       return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out as unknown as Record<string, unknown> };
-    });
+    }));
   }
 
   if (humanCoordinator) {
@@ -316,7 +317,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
           pendingHumanAction: z.any(),
         }),
       },
-      async (input) => {
+      withToolDuration(logger, 'browser.pause_for_human', async (input) => {
         const parsed = humanPause.pauseForHumanInputSchema.parse(input);
         const out = await humanPause.pauseForHuman(humanCoordinator, parsed);
         logEvent(deps.logger, 'info', 'human_pause_requested', {
@@ -328,7 +329,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
           content: [{ type: 'text' as const, text: JSON.stringify(out) }],
           structuredContent: out as unknown as Record<string, unknown>,
         };
-      }
+      })
     );
 
     server.registerTool(
@@ -344,7 +345,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
           authState: z.enum(['logged_in', 'login_required', 'unknown']),
         }),
       },
-      async (input) => {
+      withToolDuration(logger, 'browser.resume_session', async (input) => {
         const parsed = humanResume.resumeSessionInputSchema.parse(input);
         const out = await humanResume.resumeSession(humanCoordinator, parsed);
         logEvent(deps.logger, 'info', 'human_resumed', {
@@ -355,7 +356,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
           content: [{ type: 'text' as const, text: JSON.stringify(out) }],
           structuredContent: out as unknown as Record<string, unknown>,
         };
-      }
+      })
     );
 
     server.registerTool(
@@ -369,14 +370,14 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
           pendingHumanAction: z.any().nullable().optional(),
         }),
       },
-      async (input) => {
+      withToolDuration(logger, 'browser.get_human_wait_state', async (input) => {
         const parsed = humanWaitState.getHumanWaitStateInputSchema.parse(input);
         const out = await humanWaitState.getHumanWaitState(humanCoordinator, parsed);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(out) }],
           structuredContent: out as unknown as Record<string, unknown>,
         };
-      }
+      })
     );
   }
 
@@ -389,7 +390,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
         inputSchema: authSave.saveAuthContextInputSchema,
         outputSchema: z.any(),
       },
-      async (input) => {
+      withToolDuration(logger, 'browser.save_auth_context', async (input) => {
         const parsed = authSave.saveAuthContextInputSchema.parse(input);
         const out = await authSave.saveAuthContext(authContextService, sessionManager, parsed);
         logEvent(deps.logger, 'info', 'auth_context_saved', {
@@ -400,7 +401,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
           content: [{ type: 'text' as const, text: JSON.stringify(out) }],
           structuredContent: out as unknown as Record<string, unknown>,
         };
-      }
+      })
     );
 
     server.registerTool(
@@ -415,7 +416,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
           success: z.literal(true),
         }),
       },
-      async (input) => {
+      withToolDuration(logger, 'browser.load_auth_context', async (input) => {
         const parsed = authLoad.loadAuthContextInputSchema.parse(input);
         const out = await authLoad.loadAuthContext(authContextService, sessionManager, parsed);
         logEvent(deps.logger, 'info', 'auth_context_loaded', {
@@ -427,7 +428,7 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
           content: [{ type: 'text' as const, text: JSON.stringify(out) }],
           structuredContent: out as unknown as Record<string, unknown>,
         };
-      }
+      })
     );
 
     server.registerTool(
@@ -437,13 +438,13 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
         description: 'List all saved auth contexts.',
         outputSchema: z.object({ authContexts: z.array(z.any()) }),
       },
-      async () => {
+      withToolDuration(logger, 'browser.list_auth_contexts', async (_input) => {
         const out = await authList.listAuthContexts(authContextService);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(out) }],
           structuredContent: out as unknown as Record<string, unknown>,
         };
-      }
+      })
     );
 
     server.registerTool(
@@ -454,14 +455,14 @@ export function registerTools(server: McpServer, deps: ServerDeps): void {
         inputSchema: authDelete.deleteAuthContextInputSchema,
         outputSchema: z.object({ success: z.literal(true) }),
       },
-      async (input) => {
+      withToolDuration(logger, 'browser.delete_auth_context', async (input) => {
         const parsed = authDelete.deleteAuthContextInputSchema.parse(input);
         await authDelete.deleteAuthContext(authContextService, parsed);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ success: true }) }],
           structuredContent: { success: true as const },
         };
-      }
+      })
     );
   }
 }

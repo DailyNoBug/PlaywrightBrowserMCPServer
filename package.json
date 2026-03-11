@@ -4,31 +4,53 @@
   "description": "Login-state human-in-the-loop Browser MCP Server for Cursor",
   "type": "module",
   "main": "dist/index.js",
+  "bin": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "vitest run tests/integration --testTimeout=30000"
+    "test:integration": "vitest run tests/integration --testTimeout=30000",
+    "lint": "eslint src tests --max-warnings 0",
+    "package:linux-amd64": "npm run build && pkg . --targets node20-linux-x64 --output build/playwright-browser-mcp"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "playwright": "^1.49.0",
+    "fs-extra": "^11.2.0",
     "pino": "^9.5.0",
     "pino-pretty": "^11.3.0",
-    "zod": "^3.23.0",
+    "playwright": "^1.49.0",
     "uuid": "^10.0.0",
-    "fs-extra": "^11.2.0"
+    "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@types/node": "^22.0.0",
     "@types/uuid": "^10.0.0",
+    "eslint": "^9.39.4",
+    "globals": "^15.15.0",
+    "pkg": "^5.8.1",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
+    "typescript-eslint": "^8.56.1",
     "vitest": "^2.1.0"
+  },
+  "pkg": {
+    "scripts": [
+      "dist/**/*.js"
+    ],
+    "assets": [
+      "config/default.json",
+      "docs/**/*",
+      "data/.gitkeep"
+    ],
+    "targets": [
+      "node20-linux-x64"
+    ],
+    "outputPath": "build"
   }
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { BrowserAdapter, BrowserSessionHandle, CreateSessionOptions } from '../../src/browser/adapter.js';
 import { SessionManager } from '../../src/browser/sessionManager.js';
 

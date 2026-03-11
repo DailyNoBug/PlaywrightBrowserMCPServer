@@ -20,7 +20,6 @@ export interface ServerDeps {
 }
 
 export async function createServer(deps: ServerDeps): Promise<McpServer> {
-  const { config } = deps;
   const server = new McpServer({
     name: 'playwright-browser-mcp',
     version: '0.1.0',

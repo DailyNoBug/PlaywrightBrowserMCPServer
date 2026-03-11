@@ -35,5 +35,6 @@
 
 ## 环境变量
 
-- `CONFIG_PATH`：配置文件路径（覆盖默认 `config/default.json`）。
-- `LOG_LEVEL`：部分运行时支持通过该变量覆盖日志级别（若实现）。
+- **`CONFIG_PATH`**：配置文件路径，覆盖默认 `config/default.json`。
+- **`LOG_LEVEL`**：覆盖日志级别，优先于配置文件中的 `logging.level`。有效值为 `debug`、`info`、`warn`、`error`（不区分大小写）；无效值时回退为配置中的 `logging.level`。  
+  示例：`LOG_LEVEL=debug npm run dev`

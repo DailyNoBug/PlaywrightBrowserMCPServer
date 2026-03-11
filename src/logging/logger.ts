@@ -1,6 +1,13 @@
 import pino from 'pino';
 import type { LoggingConfig } from '../config/schema.js';
 
+const VALID_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
+
+function resolveLogLevel(envLevel: string | undefined, configLevel: string): string {
+  const raw = (envLevel ?? configLevel).toLowerCase();
+  return VALID_LEVELS.includes(raw as (typeof VALID_LEVELS)[number]) ? raw : configLevel;
+}
+
 export interface LogContext {
   module?: string;
   event?: string;
@@ -16,7 +23,7 @@ export interface LogContext {
 let loggerInstance: pino.Logger | null = null;
 
 export function createLogger(config: LoggingConfig): pino.Logger {
-  const level = (process.env.LOG_LEVEL as string) || config.level;
+  const level = resolveLogLevel(process.env.LOG_LEVEL, config.level);
   loggerInstance = pino({
     level,
     base: undefined,

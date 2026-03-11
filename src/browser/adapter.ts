@@ -3,7 +3,6 @@
  * Enables swapping to a remote provider later.
  */
 
-import type { BrowserSessionMeta } from '../types/session.js';
 import type { PageSnapshot } from '../types/snapshot.js';
 import type { TableExtractionResult, FormExtractionResult } from '../types/extraction.js';
 import type { InteractiveElementSummary } from '../types/snapshot.js';

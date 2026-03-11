@@ -29,6 +29,30 @@ npm run build
 npm run dev   # 以 stdio 方式启动，供 Cursor 连接
 ```
 
+### 打包为 Linux amd64 独立二进制
+
+项目内已集成 [`pkg`](https://github.com/vercel/pkg) 打包配置，可在本机构建一个 **可直接分发到其他 Linux x86_64 机器运行的单文件二进制**。
+
+```bash
+# 在仓库根目录
+npm install        # 首次需要安装依赖
+npm run build      # 先编译 TypeScript -> dist
+npm run package:linux-amd64
+```
+
+构建完成后，会在 `build/` 目录下生成：
+
+- `build/playwright-browser-mcp`：Linux amd64 自包含二进制
+
+运行方式（与原来用 `node dist/index.js` 一样，仍然通过 stdio 提供 MCP 能力）：
+
+```bash
+./build/playwright-browser-mcp
+```
+
+> 二进制内部自带默认配置文件 `config/default.json`，也支持通过环境变量 `CONFIG_PATH` 指定外部配置文件路径。  
+> 数据目录（`storage.baseDir`，默认 `data/`）会在可执行文件所在目录下自动创建，方便把 `build/` 整体拷贝到其他机器直接运行。
+
 **验证功能（访问真实网站）**：集成测试会启动无头浏览器访问 example.com 并做快照，确保整条链路正常。
 
 ```bash
@@ -51,7 +75,7 @@ npm run test:integration
 > ```
 > 否则会报 **Cannot find module '.../dist/index.js'**。构建成功后才会生成 `dist/` 目录。
 
-### 方式一：Cursor 设置界面
+### 方式一：Cursor 设置界面（本机或目标机器用 Node 运行）
 
 1. 打开 **Cursor** → **Settings**（`Ctrl+,` / `Cmd+,`）→ 左侧选择 **MCP**。
 2. 点击 **Add new MCP server**（或 **Edit Config** 打开 MCP 配置文件）。
@@ -73,7 +97,7 @@ npm run test:integration
 
 4. 保存后重启 Cursor，或重新加载 MCP，即可在对话中使用该服务。
 
-### 方式二：直接编辑 MCP 配置文件
+### 方式二：直接编辑 MCP 配置文件（本机或目标机器用 Node 运行）
 
 MCP 配置通常位于：
 
@@ -161,6 +185,56 @@ which node
 sudo apt install nodejs   # 或你的发行版等价命令
 ```
 然后在 MCP 配置里使用 `"command": "/usr/bin/node"`（或 `which node` 在系统安装后的输出）。
+
+### 方式三：在其他机器上使用打包好的二进制
+
+如果你在一台构建机上已经执行过：
+
+```bash
+npm run build
+npm run package:linux-amd64
+```
+
+会得到 `build/playwright-browser-mcp` 二进制。你可以把它拷贝到任意 Linux amd64 机器上直接作为 MCP `command` 使用，无需在目标机安装 Node。
+
+1. 在目标机上准备目录并拷贝二进制（可选同时拷贝 `config/`、`data/`）：
+
+   ```bash
+   mkdir -p ~/apps/playwright-mcp
+   cp build/playwright-browser-mcp ~/apps/playwright-mcp/
+   chmod +x ~/apps/playwright-mcp/playwright-browser-mcp
+   ```
+
+2. 在目标机上打开 Cursor 的 MCP 配置（`Settings -> MCP` 或直接编辑 `mcp.json`），在 `mcpServers` 中增加：
+
+   ```json
+   "playwright-browser": {
+     "command": "/home/USER/apps/playwright-mcp/playwright-browser-mcp",
+     "args": [],
+     "cwd": "/home/USER/apps/playwright-mcp"
+   }
+   ```
+
+   - 将 `/home/USER/apps/playwright-mcp` 改为目标机上的真实绝对路径。
+   - `command` 指向二进制文件本身；`args` 一般为空数组即可。
+   - `cwd` 设为可执行文件所在目录，方便读取 `config/default.json`、写入 `data/` 等。
+
+3. 如需在目标机上使用自定义配置文件，可以在 MCP 配置里通过环境变量传入（如果 `mcp.json` 支持 `env` 字段）：
+
+   ```json
+   "playwright-browser": {
+     "command": "/home/USER/apps/playwright-mcp/playwright-browser-mcp",
+     "args": [],
+     "cwd": "/home/USER/apps/playwright-mcp",
+     "env": {
+       "CONFIG_PATH": "/home/USER/apps/playwright-mcp/config/prod.json"
+     }
+   }
+   ```
+
+   如果不方便配置 `env`，也可以直接把想要的配置保存为 `cwd/config/default.json`，二进制会自动读取该文件。
+
+4. 保存配置后，重载 MCP 或重启 Cursor，即可在目标机上通过这一个二进制使用 `browser.*` 工具。
 
 ### 配置说明
 
@@ -252,7 +326,7 @@ npm run build
 
 - 默认配置：`config/default.json`
 - 环境变量 `CONFIG_PATH` 可指定配置文件路径
-- 环境变量 `LOG_LEVEL` 可覆盖日志级别
+- 环境变量 `LOG_LEVEL` 可覆盖日志级别（有效值：`debug`、`info`、`warn`、`error`），详见 [配置说明](docs/configuration.md)
 
 ## 工程阶段
 

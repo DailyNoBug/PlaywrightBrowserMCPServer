@@ -18,8 +18,6 @@ export async function exportExtractionResult(
   input: z.infer<typeof exportExtractionResultInputSchema>
 ): Promise<{ exportPath: string }> {
   const exportId = `export-${Date.now()}`;
-  const dir = resolve(baseDir, 'exports');
-  const path = `${dir}/${exportId}.${input.format}`;
   let content: string;
   if (input.source === 'latest_table' && store.table) {
     checkExportRows(store.table.rowCount, { maxExportRows: policy.maxExportRows, maxPaginationPages: 10 });

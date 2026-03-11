@@ -7,7 +7,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { loadConfig } from '../../src/config/config.js';
-import { FileStorage } from '../../src/storage/fileStorage.js';
 import { PlaywrightAdapter } from '../../src/browser/playwrightAdapter.js';
 import { SessionManager } from '../../src/browser/sessionManager.js';
 
@@ -21,7 +20,6 @@ describe('Browser flow integration', () => {
 
   beforeAll(() => {
     config = loadConfig();
-    const storage = new FileStorage({ baseDir: config.storage.baseDir });
     adapter = new PlaywrightAdapter({ actionTimeoutMs: config.browser.actionTimeoutMs });
     sessionManager = new SessionManager(adapter, undefined, { maxSessions: config.browser.maxSessions });
   });
